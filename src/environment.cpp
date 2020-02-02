@@ -60,10 +60,30 @@ void simpleHighway(pcl::visualization::PCLVisualizer::Ptr& viewer)
     // ProcessPointClouds<pcl::PointXYZ> pointProcessor; // Instantiate object on stack (not recommended)
     ProcessPointClouds<pcl::PointXYZ>* pointProcessor = new ProcessPointClouds<pcl::PointXYZ>(); // Instantiate object on heap
     std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmentCloud = pointProcessor->SegmentPlane(inputCloud,1,0.2);
-
-    // Render the obstacle and plane point cloud
+    
+    // Render obstacle and plane point cloud
     renderPointCloud(viewer, segmentCloud.first, "obstCloud",Color(1,0,0));
     renderPointCloud(viewer, segmentCloud.second, "planeCloud",Color(0,1,0));
+
+    // Feeding in the obstacle cloud with min 3 points and max 30 points consider as cluster
+    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloudClusters = pointProcessor->Clustering(segmentCloud.first, 1.0, 3, 30);
+
+    int clusterId = 0;
+    // Vector of color in red, yellow, blue
+    std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1)};
+
+    // Iterating through cluster
+    for (pcl::PointCloud<pcl::PointXYZ>::Ptr cluster:cloudClusters)
+    {
+        std::cout << "cluster size ";
+        pointProcessor->numPoints(cluster);
+        renderPointCloud(viewer,cluster,"obstCloud"+std::to_string(clusterId),colors[clusterId%colors.size()]);
+
+        // Box box = pointProcessor.BoundingBox(cluster);
+        // renderBox(viewer,box,clusterId);
+
+        ++clusterId;
+    }
 }
 
 
