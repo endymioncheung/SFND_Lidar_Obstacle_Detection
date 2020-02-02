@@ -69,19 +69,65 @@ void render2DTree(Node* node, pcl::visualization::PCLVisualizer::Ptr& viewer, Bo
 
 		render2DTree(node->left,viewer, lowerWindow, iteration, depth+1);
 		render2DTree(node->right,viewer, upperWindow, iteration, depth+1);
-
-
 	}
 
+}
+
+void clusterHelper(int indice, const std::vector<std::vector<float>> points, std::vector<int>& cluster, std::vector<bool>& processed, KdTree* tree, float distanceTol)
+{
+	// Mark the point as being processed
+	processed[indice] = true;
+	// Add the point back to the cluster
+	cluster.push_back(indice);
+	
+	// Find the list of indices of the nearby points
+	// using tree search with indice and distance tolerance
+	std::vector<int> nearest = tree->search(points[indice],distanceTol);
+	
+	// Iterate through nearby indices
+	for (int id:nearest)
+	{
+		// If the point has not been processed yet,
+		// then pass in the point ID and other parameters.
+		// The function runs recursively to build up the cluster
+		if(!processed[id])
+			clusterHelper(id, points, cluster, processed, tree, distanceTol);
+	}
 }
 
 std::vector<std::vector<int>> euclideanCluster(const std::vector<std::vector<float>>& points, KdTree* tree, float distanceTol)
 {
 
 	// TODO: Fill out this function to return list of indices for each cluster
-
 	std::vector<std::vector<int>> clusters;
  
+	// Create a vector of boolean to keep track of which points have been processed. 
+	// The size of boolean vector will match the same size as points.
+	// Initialize processed vector to be false as the points are not yet processed
+	std::vector<bool> processed(points.size(),false);
+	
+	int i = 0;
+	while (i < points.size())
+	{
+		// If the point has been processed already
+		// move on to next point, increment the point and continue
+		if(processed[i])
+		{
+			i++;
+			continue;
+		}
+		
+		// Otherwise if the point has not yet been processed
+		// create a new cluster of ints
+		std::vector<int> cluster;
+		
+		// Calling proximity function
+		clusterHelper(i, points, cluster, processed, tree, distanceTol);
+		// Add cluster to the vector of clusters
+		clusters.push_back(cluster);
+		i++;
+	}
+
 	return clusters;
 
 }
@@ -144,6 +190,5 @@ int main ()
   	while (!viewer->wasStopped ())
   	{
   	  viewer->spinOnce ();
-  	}
-  	
+  	} 	
 }
