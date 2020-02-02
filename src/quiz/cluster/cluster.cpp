@@ -3,6 +3,9 @@
 
 #include "../../render/render.h"
 #include "../../render/box.h"
+#include "processPointClouds.h"
+// using templates for processPointClouds so also include .cpp to help linker
+#include "processPointClouds.cpp"
 #include <chrono>
 #include <string>
 #include "kdtree.h"
@@ -176,12 +179,19 @@ int main ()
   	// Render clusters
   	int clusterId = 0;
 	std::vector<Color> colors = {Color(1,0,0), Color(0,1,0), Color(0,0,1)};
+	ProcessPointClouds<pcl::PointXYZ>* pointProcessor = new ProcessPointClouds<pcl::PointXYZ>(); // Instantiate object on heap
   	for(std::vector<int> cluster : clusters)
   	{
   		pcl::PointCloud<pcl::PointXYZ>::Ptr clusterCloud(new pcl::PointCloud<pcl::PointXYZ>());
   		for(int indice: cluster)
   			clusterCloud->points.push_back(pcl::PointXYZ(points[indice][0],points[indice][1],0));
-  		renderPointCloud(viewer, clusterCloud,"cluster"+std::to_string(clusterId),colors[clusterId%3]);
+  		
+		renderPointCloud(viewer, clusterCloud,"cluster"+std::to_string(clusterId),colors[clusterId%3]);
+
+		// Rendering bounding box around the cluster
+        Box box = pointProcessor->BoundingBox(clusterCloud);
+        renderBox(viewer,box,clusterId,colors[clusterId%colors.size()]);
+
   		++clusterId;
   	}
   	if(clusters.size()==0)
