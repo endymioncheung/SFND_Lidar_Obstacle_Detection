@@ -56,7 +56,7 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer)
 
     int max_x = 30;
     int max_y = 8.5;
-    int max_z = 2.5;
+    int max_z = 0.5;
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr filterCloud = pointProcessorI->FilterCloud(inputCloud,VoxelGridSize,
                                                                                     Eigen::Vector4f(min_x,min_y,min_z,1),
