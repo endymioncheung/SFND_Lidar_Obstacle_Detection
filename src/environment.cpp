@@ -37,13 +37,31 @@ std::vector<Car> initHighway(bool renderScene, pcl::visualization::PCLVisualizer
 
 void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer)
 {
-  // ----------------------------------------------------
-  // -----Open 3D viewer and display City Block     -----
-  // ----------------------------------------------------
+    // ----------------------------------------------------
+    // -----Open 3D viewer and display City Block     -----
+    // ----------------------------------------------------
 
-  ProcessPointClouds<pcl::PointXYZI>* pointProcessorI = new ProcessPointClouds<pcl::PointXYZI>();
-  pcl::PointCloud<pcl::PointXYZI>::Ptr inputCloud = pointProcessorI->loadPcd("../src/sensors/data/pcd/data_1/0000000000.pcd");
-  renderPointCloud(viewer,inputCloud,"inputCloud");
+    ProcessPointClouds<pcl::PointXYZI>* pointProcessorI = new ProcessPointClouds<pcl::PointXYZI>();
+    pcl::PointCloud<pcl::PointXYZI>::Ptr inputCloud = pointProcessorI->loadPcd("../src/sensors/data/pcd/data_1/0000000000.pcd");
+    // renderPointCloud(viewer,inputCloud,"inputCloud");
+
+    // Voxel grid size [meters]
+    float VoxelGridSize = 0.3;
+    
+    // Region of interest min and max points
+    // [offset from the center of the car in meters]
+    int min_x = -10;
+    int min_y = -6.7;
+    int min_z = -2;
+
+    int max_x = 30;
+    int max_y = 8.5;
+    int max_z = 2.5;
+
+    pcl::PointCloud<pcl::PointXYZI>::Ptr filterCloud = pointProcessorI->FilterCloud(inputCloud,VoxelGridSize,
+                                                                                    Eigen::Vector4f(min_x,min_y,min_z,1),
+                                                                                    Eigen::Vector4f(max_x,max_y,max_z,1));
+    renderPointCloud(viewer,filterCloud,"filterCloud"); 
 }
 
 void simpleHighway(pcl::visualization::PCLVisualizer::Ptr& viewer)

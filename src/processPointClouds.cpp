@@ -19,24 +19,74 @@ void ProcessPointClouds<PointT>::numPoints(typename pcl::PointCloud<PointT>::Ptr
     std::cout << cloud->points.size() << std::endl;
 }
 
-
 template<typename PointT>
 typename pcl::PointCloud<PointT>::Ptr ProcessPointClouds<PointT>::FilterCloud(typename pcl::PointCloud<PointT>::Ptr cloud, float filterRes, Eigen::Vector4f minPoint, Eigen::Vector4f maxPoint)
 {
-
     // Time segmentation process
     auto startTime = std::chrono::steady_clock::now();
 
     // TODO:: Fill in the function to do voxel grid point reduction and region based filtering
+    // Create Voxel Grid
+    pcl::VoxelGrid<PointT> vg;
+    typename pcl::PointCloud<PointT>::Ptr cloudFiltered(new pcl::PointCloud<PointT>);
+    //std::cout << typeid(vg).name() << endl;
+    // Set the input to the Voxel Grid
+    vg.setInputCloud(cloud);
+    // Define the cell size
+    vg.setLeafSize(filterRes,filterRes,filterRes);
+    // Save the results to cloudFiltered
+    vg.filter(*cloudFiltered);
+    std::cerr << "PointCloud after voxel grid point reduction: " << cloudFiltered->width * cloudFiltered->height 
+       << " data points (" << pcl::getFieldsList (*cloudFiltered) << ")." << std::endl << std::endl;
+
+    typename pcl::PointCloud<PointT>::Ptr cloudRegion(new pcl::PointCloud<PointT>);
+    // Set region to true for dealing with points inside the CropBox
+    pcl::CropBox<PointT> region(true);
+    region.setMin(minPoint);
+    region.setMax(maxPoint);
+    // Set the input cloud to the cloudFiltered from the Voxel Grid
+    region.setInputCloud(cloudFiltered);
+    // Save the results in the cloud region
+    // Crop and save the points left inside the box region
+    region.filter(*cloudRegion);
+    std::cerr << "PointCloud after region of interest: " << cloudRegion->width * cloudRegion->height 
+       << " data points (" << pcl::getFieldsList (*cloudRegion) << ")." << std::endl;
+
+    // Optional to remove the roof points
+    // Use CropBox to remove the points outside the region
+    pcl::CropBox<PointT> roof(true);
+    roof.setMin(Eigen::Vector4f(-1.5,-1.7,-1,1));
+    roof.setMax(Eigen::Vector4f(2.6,1.7,-0.4,1));
+    roof.setInputCloud(cloudRegion);
+    // Results are indices of the points inside the cloud region
+    // that fit inside the box
+    std::vector<int> indices;
+    roof.filter(indices);
+
+    // Add the indice of points inside the cloud region
+    // to the inliers vector
+    pcl::PointIndices::Ptr inliers {new pcl::PointIndices};
+    for (int point:indices)
+        inliers->indices.push_back(point);
+    
+    // Separate point cloud using segmentation
+    pcl::ExtractIndices<PointT> extract;
+    extract.setInputCloud(cloudRegion);
+    // Set indices of roofPoints
+    extract.setIndices(inliers);
+    // Set negative to remove these roof points
+    extract.setNegative(true);
+    // Extract indices from updated inliers without the roof points
+    extract.filter(*cloudRegion);
+    std::cerr << "PointCloud after roof points removed: " << cloudRegion->width * cloudRegion->height 
+       << " data points (" << pcl::getFieldsList (*cloudRegion) << ").";
 
     auto endTime = std::chrono::steady_clock::now();
     auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
     std::cout << "filtering took " << elapsedTime.count() << " milliseconds" << std::endl;
 
-    return cloud;
-
+    return cloudRegion;
 }
-
 
 template<typename PointT>
 std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> ProcessPointClouds<PointT>::SeparateClouds(pcl::PointIndices::Ptr inliers, typename pcl::PointCloud<PointT>::Ptr cloud) 
