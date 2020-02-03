@@ -3,9 +3,9 @@
 
 #include "../../render/render.h"
 #include "../../render/box.h"
-#include "processPointClouds.h"
+#include "../../processPointClouds.h"
 // using templates for processPointClouds so also include .cpp to help linker
-#include "processPointClouds.cpp"
+#include "../../processPointClouds.cpp"
 #include <chrono>
 #include <string>
 #include "kdtree.h"
