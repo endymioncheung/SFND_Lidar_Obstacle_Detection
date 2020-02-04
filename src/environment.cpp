@@ -41,32 +41,43 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer)
     // -----Open 3D viewer and display City Block     -----
     // ----------------------------------------------------
 
+    // Load Point Cloud Data (PCD)
     ProcessPointClouds<pcl::PointXYZI>* pointProcessorI = new ProcessPointClouds<pcl::PointXYZI>();
     pcl::PointCloud<pcl::PointXYZI>::Ptr inputCloud = pointProcessorI->loadPcd("../src/sensors/data/pcd/data_1/0000000000.pcd");
+
+    // DEBUG: render the input PCD
     // renderPointCloud(viewer,inputCloud,"inputCloud");
 
+    /*************************************************************************
+    | Step 0. Preprocess PCD: downsampling and select region of interest     |
+    /************************************************************************/
+
     // Voxel grid size [meters]
-    float VoxelGridSize = 0.3;
+    float VoxelGridSize = 0.35;
     
     // Region of interest min and max points
     // [offset from the center of the car in meters]
-    int min_x = -10;
-    int min_y = -6.7;
-    int min_z = -2;
-    int max_x = 30;
-    int max_y = 8.5;
-    int max_z = 0.5;
+    float min_x = -10;
+    float min_y = -5.5;
+    float min_z = -2;
+    float max_x = 30;
+    float max_y = 7.5;
+    float max_z = 0.5;
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr filterCloud = pointProcessorI->FilterCloud(inputCloud,VoxelGridSize,
                                                                                     Eigen::Vector4f(min_x,min_y,min_z,1),
                                                                                     Eigen::Vector4f(max_x,max_y,max_z,1));
+    // DEBUG: render the down-sampled cloud
     // renderPointCloud(viewer,filterCloud,"filterCloud");
+
+    /*************************************************************************
+    | Step 1. Segment the filtered cloud into two parts, road and obstacles. |
+    /************************************************************************/
 
     /* Segment PCD using RANSAC (3D) plane algorithm */
 	int maxIterations = 100;
-    float distanceTol = 0.3;
-	std::unordered_set<int> inliers = pointProcessorI->RansacPlane(filterCloud,maxIterations,distanceTol);
-
+    float RANSAC_distanceTol = 0.3;
+	std::unordered_set<int> inliers = pointProcessorI->RansacPlane(filterCloud,maxIterations,RANSAC_distanceTol);
 	pcl::PointCloud<pcl::PointXYZI>::Ptr  cloudInliers(new pcl::PointCloud<pcl::PointXYZI>());
 	pcl::PointCloud<pcl::PointXYZI>::Ptr cloudOutliers(new pcl::PointCloud<pcl::PointXYZI>());
 
@@ -79,29 +90,84 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer)
 			cloudOutliers->points.push_back(point);
 	}
 
-	// Render cloud with inliers and outliers
+	// Render road plane (inliers) in green 
+    // and obstacle (outliers) in red
 	if(inliers.size())
 	{
-        // Color road plane in green
-		renderPointCloud(viewer,cloudInliers,"inliers",Color(0,1,0));
-        // Color obstacles in red
-  		renderPointCloud(viewer,cloudOutliers,"outliers",Color(1,0,0));
+		renderPointCloud(viewer,cloudInliers,"Plane Cloud",Color(0,1,0));
+  		renderPointCloud(viewer,cloudOutliers,"Obstacle Cloud",Color(1,0,0));
 	}
   	else
   	{
+        std::cerr << "Could not estimate a planar model for the given dataset." << std::endl;
   		renderPointCloud(viewer,filterCloud,"data");
   	}
 
-    // Bounding roof box of the ego car
-    Box roof_box;
-    roof_box.x_min = -1.5;
-    roof_box.y_min = -1.7;
-    roof_box.z_min = -1;
-    roof_box.x_max = 2.6;
-    roof_box.y_max = 1.7;
-    roof_box.z_max = -0.4;
+    /*
+    // Bounding box of the ego car roof
+    Box ego_carRoof;
+    ego_carRoof.x_min = -1.5;
+    ego_carRoof.y_min = -1.7;
+    ego_carRoof.z_min = -1;
+    ego_carRoof.x_max = 2.6;
+    ego_carRoof.y_max = 1.7;
+    ego_carRoof.z_max = -0.4;
     Color purple = Color(128,0,128);
-    renderBox(viewer,roof_box,999,purple);
+    renderBox(viewer,ego_carRoof,999,purple);
+    */
+
+    /********************************************
+    | Step 2. Cluster the obstacle cloud        |
+    /*******************************************/
+
+    auto startTime = std::chrono::steady_clock::now();
+
+    // Inserting obstacle cloud into KD-Tree
+    KdTree* tree = new KdTree;
+    std::vector<std::vector<float>> points;
+    int i = 0;
+    for (auto point : cloudOutliers->points) {
+        const std::vector<float> p{ point.x, point.y, point.z };
+        tree->insert(p, i++);
+        points.push_back(p);
+    }
+
+  	float cluster_distanceTol = 0.75;
+    int minSize = 10;
+    int maxSize = 999;
+  	std::vector<std::vector<int>> clusters = pointProcessorI->euclideanCluster(points, tree, cluster_distanceTol, minSize, maxSize);
+  	
+  	auto endTime = std::chrono::steady_clock::now();
+  	auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+  	std::cout << "Found " << clusters.size() << " clusters and took " << elapsedTime.count() << " milliseconds" << std::endl;
+
+    /************************************************
+    | Step 3. Find bounding boxes for the clusters  |
+    /***********************************************/
+
+	std::vector<Color> colors = {Color(1,0,0), Color(0,1,0), Color(0,0,1)};
+	ProcessPointClouds<pcl::PointXYZ>* pointProcessor = new ProcessPointClouds<pcl::PointXYZ>();
+    int clusterId = 0;
+  	for(std::vector<int> cluster:clusters)
+  	{
+        // Create clusters cloud
+  		pcl::PointCloud<pcl::PointXYZ>::Ptr clusterCloud(new pcl::PointCloud<pcl::PointXYZ>());
+  		for(int indice: cluster)
+  			clusterCloud->points.push_back(pcl::PointXYZ(points[indice][0],points[indice][1],points[indice][2]));
+  		
+        // Render clusters in cycled colors, red, yellow, and blue
+		renderPointCloud(viewer, clusterCloud,"cluster"+std::to_string(clusterId),colors[clusterId%3]);
+
+		// Render bounding box around the clusters
+        Box box = pointProcessor->BoundingBox(clusterCloud);
+        renderBox(viewer,box,clusterId,colors[clusterId%colors.size()]);
+
+  		++clusterId;
+  	}
+
+    // Render the obstacle cloud without bounding boxes if no clusters are found
+  	if(clusters.size() == 0)
+  		renderPointCloud(viewer,cloudOutliers,"data");
 }
 
 void simpleHighway(pcl::visualization::PCLVisualizer::Ptr& viewer)
@@ -190,7 +256,7 @@ int main (int argc, char** argv)
     CameraAngle setAngle = XY;
     initCamera(setAngle, viewer);
 
-    // Simulate highway point cloud
+    // Simulated highway point cloud
     // simpleHighway(viewer);
 
     // Real world lidar city block

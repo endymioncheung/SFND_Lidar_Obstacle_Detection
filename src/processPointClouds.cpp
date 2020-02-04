@@ -2,7 +2,6 @@
 
 #include "processPointClouds.h"
 
-
 //constructor:
 template<typename PointT>
 ProcessPointClouds<PointT>::ProcessPointClouds() {}
@@ -118,7 +117,6 @@ std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT
 
     // TODO:: Fill in this function to find inliers for the cloud.
     // see PCL tutorial for hints: http://pointclouds.org/documentation/tutorials/extract_indices.php#extract-indices
-
     // Create the segmentation object
     pcl::SACSegmentation<pcl::PointXYZ> seg;
     // Create the inliers for separating the pointClouds
@@ -137,6 +135,7 @@ std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT
     // Segment the largest planar component from the remaining cloud
     seg.setInputCloud (cloud);
     seg.segment (*inliers, *coefficients);
+    
     if (inliers->indices.size () == 0)
     {
       std::cerr << "Could not estimate a planar model for the given dataset." << std::endl;
@@ -350,4 +349,68 @@ std::unordered_set<int> ProcessPointClouds<PointT>::RansacPlane(typename pcl::Po
 
 	// Return indicies of inliers from fitted line with most inliers
 	return inliersResult;
+}
+
+template<typename PointT>
+void ProcessPointClouds<PointT>::proximity(int indice, const std::vector<std::vector<float>> points, std::vector<int>& cluster, std::vector<bool>& processed, KdTree* tree, float distanceTol)
+{
+	// Mark the point as being processed
+	processed[indice] = true;
+	// Add the point back to the cluster
+	cluster.push_back(indice);
+	
+	// Find the list of indices of the nearby points
+	// using tree search with indice and distance tolerance
+	std::vector<int> nearest = tree->search(points[indice],distanceTol);
+    
+	// Iterate through nearby indices
+	for (int id:nearest)
+	{
+		// If the point has not been processed yet,
+		// then pass in the point ID and other parameters.
+		// The function runs recursively to build up the cluster
+		if(!processed[id])
+			ProcessPointClouds<PointT>::proximity(id, points, cluster, processed, tree, distanceTol);
+	}
+}
+
+template<typename PointT>
+std::vector<std::vector<int>> ProcessPointClouds<PointT>::euclideanCluster(const std::vector<std::vector<float>>& points, KdTree* tree, float distanceTol, int minSize, int maxSize)
+{
+
+	// TODO: Fill out this function to return list of indices for each cluster
+	std::vector<std::vector<int>> clusters;
+ 
+	// Create a vector of boolean to keep track of which points have been processed. 
+	// The size of boolean vector will match the same size as points.
+	// Initialize processed vector to be false as the points are not yet processed
+	std::vector<bool> processed(points.size(),false);
+	
+	int i = 0;
+	while (i < points.size())
+	{
+		// If the point has been processed already
+		// move on to next point, increment the point and continue
+		if(processed[i])
+		{
+			i++;
+			continue;
+		}
+		
+		// Otherwise if the point has not yet been processed
+		// create a new cluster of ints
+		std::vector<int> cluster;
+		
+		// Calling proximity function
+		ProcessPointClouds<PointT>::proximity(i, points, cluster, processed, tree, distanceTol);
+
+        if (cluster.size() >= minSize && cluster.size() <= maxSize)
+        {
+            // Add cluster to the vector of clusters
+            clusters.push_back(cluster);
+        }
+		i++;
+	}
+
+	return clusters;
 }
