@@ -53,7 +53,6 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer)
     int min_x = -10;
     int min_y = -6.7;
     int min_z = -2;
-
     int max_x = 30;
     int max_y = 8.5;
     int max_z = 0.5;
@@ -61,7 +60,48 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer)
     pcl::PointCloud<pcl::PointXYZI>::Ptr filterCloud = pointProcessorI->FilterCloud(inputCloud,VoxelGridSize,
                                                                                     Eigen::Vector4f(min_x,min_y,min_z,1),
                                                                                     Eigen::Vector4f(max_x,max_y,max_z,1));
-    renderPointCloud(viewer,filterCloud,"filterCloud"); 
+    // renderPointCloud(viewer,filterCloud,"filterCloud");
+
+    /* Segment PCD using RANSAC (3D) plane algorithm */
+	int maxIterations = 100;
+    float distanceTol = 0.3;
+	std::unordered_set<int> inliers = pointProcessorI->RansacPlane(filterCloud,maxIterations,distanceTol);
+
+	pcl::PointCloud<pcl::PointXYZI>::Ptr  cloudInliers(new pcl::PointCloud<pcl::PointXYZI>());
+	pcl::PointCloud<pcl::PointXYZI>::Ptr cloudOutliers(new pcl::PointCloud<pcl::PointXYZI>());
+
+	for(int index = 0; index < filterCloud->points.size(); index++)
+	{
+		pcl::PointXYZI point = filterCloud->points[index];
+		if(inliers.count(index))
+			cloudInliers->points.push_back(point);
+		else
+			cloudOutliers->points.push_back(point);
+	}
+
+	// Render cloud with inliers and outliers
+	if(inliers.size())
+	{
+        // Color road plane in green
+		renderPointCloud(viewer,cloudInliers,"inliers",Color(0,1,0));
+        // Color obstacles in red
+  		renderPointCloud(viewer,cloudOutliers,"outliers",Color(1,0,0));
+	}
+  	else
+  	{
+  		renderPointCloud(viewer,filterCloud,"data");
+  	}
+
+    // Bounding roof box of the ego car
+    Box roof_box;
+    roof_box.x_min = -1.5;
+    roof_box.y_min = -1.7;
+    roof_box.z_min = -1;
+    roof_box.x_max = 2.6;
+    roof_box.y_max = 1.7;
+    roof_box.z_max = -0.4;
+    Color purple = Color(128,0,128);
+    renderBox(viewer,roof_box,999,purple);
 }
 
 void simpleHighway(pcl::visualization::PCLVisualizer::Ptr& viewer)
@@ -140,6 +180,7 @@ void initCamera(CameraAngle setAngle, pcl::visualization::PCLVisualizer::Ptr& vi
     if(setAngle!=FPS)
         viewer->addCoordinateSystem (1.0);
 }
+
 
 int main (int argc, char** argv)
 {
