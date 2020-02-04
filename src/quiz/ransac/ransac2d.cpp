@@ -1,9 +1,9 @@
 /* \author Aaron Brown */
 // Quiz on implementing simple RANSAC line fitting
 
-#include "../../render/render.h"
 #include <unordered_set>
 
+#include "../../render/render.h"
 #include "../../processPointClouds.h"
 // using templates for processPointClouds so also include .cpp to help linker
 #include "../../processPointClouds.cpp"
@@ -257,8 +257,7 @@ int main ()
 			cloudOutliers->points.push_back(point);
 	}
 
-
-	// Render 2D point cloud with inliers and outliers
+	// Render cloud with inliers and outliers
 	if(inliers.size())
 	{
 		renderPointCloud(viewer,cloudInliers,"inliers",Color(0,1,0));
