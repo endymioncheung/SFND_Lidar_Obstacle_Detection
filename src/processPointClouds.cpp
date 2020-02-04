@@ -35,8 +35,8 @@ typename pcl::PointCloud<PointT>::Ptr ProcessPointClouds<PointT>::FilterCloud(ty
     vg.setLeafSize(filterRes,filterRes,filterRes);
     // Save the results to cloudFiltered
     vg.filter(*cloudFiltered);
-    std::cerr << "PointCloud after voxel grid point reduction: " << cloudFiltered->width * cloudFiltered->height 
-       << " data points (" << pcl::getFieldsList (*cloudFiltered) << ")." << std::endl;
+    // std::cerr << "PointCloud after voxel grid point reduction: " << cloudFiltered->width * cloudFiltered->height 
+    //    << " data points (" << pcl::getFieldsList (*cloudFiltered) << ")." << std::endl;
 
     typename pcl::PointCloud<PointT>::Ptr cloudRegion(new pcl::PointCloud<PointT>);
     // Set region to true for dealing with points inside the CropBox
@@ -48,8 +48,8 @@ typename pcl::PointCloud<PointT>::Ptr ProcessPointClouds<PointT>::FilterCloud(ty
     // Save the results in the cloud region
     // Crop and save the points left inside the box region
     region.filter(*cloudRegion);
-    std::cerr << "PointCloud after region of interest: " << cloudRegion->width * cloudRegion->height 
-       << " data points (" << pcl::getFieldsList (*cloudRegion) << ")." << std::endl;
+    // std::cerr << "PointCloud after region of interest: " << cloudRegion->width * cloudRegion->height 
+    //    << " data points (" << pcl::getFieldsList (*cloudRegion) << ")." << std::endl;
 
     // Optional to remove the roof points
     // Use CropBox to remove the points outside the region
@@ -77,12 +77,12 @@ typename pcl::PointCloud<PointT>::Ptr ProcessPointClouds<PointT>::FilterCloud(ty
     extract.setNegative(true);
     // Extract indices from updated inliers without the roof points
     extract.filter(*cloudRegion);
-    std::cerr << "PointCloud after roof points removed: " << cloudRegion->width * cloudRegion->height 
-       << " data points (" << pcl::getFieldsList (*cloudRegion) << ").";
+    // std::cerr << "PointCloud after roof points removed: " << cloudRegion->width * cloudRegion->height 
+    //    << " data points (" << pcl::getFieldsList (*cloudRegion) << ").";
 
     auto endTime = std::chrono::steady_clock::now();
     auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-    std::cout << "filtering took " << elapsedTime.count() << " milliseconds" << std::endl;
+    // std::cout << "filtering took " << elapsedTime.count() << " milliseconds" << std::endl;
 
     return cloudRegion;
 }
@@ -242,7 +242,7 @@ typename pcl::PointCloud<PointT>::Ptr ProcessPointClouds<PointT>::loadPcd(std::s
     {
         PCL_ERROR ("Couldn't read file \n");
     }
-    std::cerr << "Loaded " << cloud->points.size () << " data points from "+file << std::endl;
+    // std::cerr << "Loaded " << cloud->points.size () << " data points from "+file << std::endl;
 
     return cloud;
 }
@@ -345,7 +345,7 @@ std::unordered_set<int> ProcessPointClouds<PointT>::RansacPlane(typename pcl::Po
 	// Stop the timer
     auto endTime = std::chrono::steady_clock::now();
     auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-    std::cout << "RANSAC Plane took " << elapsedTime.count() << " milliseconds" << std::endl;
+    // std::cout << "RANSAC Plane took " << elapsedTime.count() << " milliseconds" << std::endl;
 
 	// Return indicies of inliers from fitted line with most inliers
 	return inliersResult;

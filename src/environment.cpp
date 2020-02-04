@@ -34,16 +34,15 @@ std::vector<Car> initHighway(bool renderScene, pcl::visualization::PCLVisualizer
     return cars;
 }
 
-
-void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer)
+void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer, ProcessPointClouds<pcl::PointXYZI>* pointProcessorI, const pcl::PointCloud<pcl::PointXYZI>::Ptr& inputCloud)
 {
     // ----------------------------------------------------
     // -----Open 3D viewer and display City Block     -----
     // ----------------------------------------------------
 
-    // Load Point Cloud Data (PCD)
-    ProcessPointClouds<pcl::PointXYZI>* pointProcessorI = new ProcessPointClouds<pcl::PointXYZI>();
-    pcl::PointCloud<pcl::PointXYZI>::Ptr inputCloud = pointProcessorI->loadPcd("../src/sensors/data/pcd/data_1/0000000000.pcd");
+    // Load Point Cloud Data (PCD) - now disable as the PCD will be stream from main()
+    // ProcessPointClouds<pcl::PointXYZI>* pointProcessorI = new ProcessPointClouds<pcl::PointXYZI>();
+    // pcl::PointCloud<pcl::PointXYZI>::Ptr inputCloud = pointProcessorI->loadPcd("../src/sensors/data/pcd/data_1/0000000000.pcd");
 
     // DEBUG: render the input PCD
     // renderPointCloud(viewer,inputCloud,"inputCloud");
@@ -53,7 +52,7 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer)
     /************************************************************************/
 
     // Voxel grid size [meters]
-    float VoxelGridSize = 0.35;
+    float VoxelGridSize = 0.4;
     
     // Region of interest min and max points
     // [offset from the center of the car in meters]
@@ -132,8 +131,8 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer)
         points.push_back(p);
     }
 
-  	float cluster_distanceTol = 0.75;
-    int minSize = 10;
+  	float cluster_distanceTol = 0.5;
+    int minSize = 8;
     int maxSize = 999;
   	std::vector<std::vector<int>> clusters = pointProcessorI->euclideanCluster(points, tree, cluster_distanceTol, minSize, maxSize);
   	
@@ -158,9 +157,12 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer)
         // Render clusters in cycled colors, red, yellow, and blue
 		renderPointCloud(viewer, clusterCloud,"cluster"+std::to_string(clusterId),colors[clusterId%3]);
 
-		// Render bounding box around the clusters
+		// Render bounding box around the clusters in red
         Box box = pointProcessor->BoundingBox(clusterCloud);
-        renderBox(viewer,box,clusterId,colors[clusterId%colors.size()]);
+        renderBox(viewer,box,clusterId,Color(1,0,0));
+
+        // Bounding box color cycle red, green blue
+        // renderBox(viewer,box,clusterId,colors[clusterId%colors.size()]);
 
   		++clusterId;
   	}
@@ -259,11 +261,32 @@ int main (int argc, char** argv)
     // Simulated highway point cloud
     // simpleHighway(viewer);
 
-    // Real world lidar city block
-    cityBlock(viewer);
+    // Create file stream for process point cloud
+    ProcessPointClouds<pcl::PointXYZI>* pointProcessorI = new ProcessPointClouds<pcl::PointXYZI>();
+    
+    // PCD dataset 1: Cars in city blocks
+    std::vector<boost::filesystem::path> stream = pointProcessorI->streamPcd("../src/sensors/data/pcd/data_1");
+    // PCD dataset 2: Cars and cyclist in city blocks
+    // std::vector<boost::filesystem::path> stream = pointProcessorI->streamPcd("../src/sensors/data/pcd/data_2");
+    
+    auto streamIterator = stream.begin();
+    pcl::PointCloud<pcl::PointXYZI>::Ptr inputCloudI;
 
     while (!viewer->wasStopped ())
     {
+        // Clear viewer
+        viewer->removeAllPointClouds();
+        viewer->removeAllShapes();
+
+        // Load pcd and run obstacle detection process
+        inputCloudI = pointProcessorI->loadPcd((*streamIterator).string());
+        // Real world lidar city block
+        cityBlock(viewer, pointProcessorI, inputCloudI);
+
+        streamIterator++;
+        if(streamIterator == stream.end())
+        streamIterator = stream.begin();
+
         viewer->spinOnce ();
     } 
 }
